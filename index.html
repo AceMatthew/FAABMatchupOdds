@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>League Matchup Odds</title>
+<style>
+  :root {
+    --maroon: #7A1128;
+    --maroon-dark: #560C1C;
+    --maroon-light: #A8425C;
+    --maroon-tint: #FBEEF0;
+    --bg: #F5F2F2;
+    --card: #FFFFFF;
+    --text: #241014;
+    --muted: #7A6A6D;
+    --profit: #16a34a;
+    --border: #ECD9DD;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    padding: 20px 14px 40px;
+  }
+  .wrap { width: 100%; max-width: 440px; }
+
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 4px 2px;
+  }
+  .header img.logo {
+    width: 48px; height: 48px; border-radius: 10px;
+    object-fit: cover; border: 2px solid var(--maroon);
+    background: white;
+  }
+  .header .logo-placeholder {
+    width: 48px; height: 48px; border-radius: 10px;
+    background: var(--maroon); color: white; display: flex;
+    align-items: center; justify-content: center; font-weight: 700;
+    font-size: 18px; border: 2px solid var(--maroon-dark);
+  }
+  .header h1 { font-size: 34px; font-weight: 400; line-height: 1; margin: 0; color: var(--maroon-dark); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .header .week-right { font-size: 16px; color: var(--muted); flex-shrink: 0; text-align: right; line-height: 1; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(122,17,40,0.06);
+  }
+  h2 { font-size: 15px; margin: 0 0 12px 0; color: var(--maroon-dark); }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; margin-top: 12px; color: var(--text); }
+  input, select {
+    width: 100%; padding: 11px 13px; border-radius: 10px;
+    border: 1px solid var(--border); font-size: 15px; background: #fdfafa;
+    color: var(--text);
+  }
+  input:focus, select:focus { outline: none; border-color: var(--maroon); background: white; }
+
+  button {
+    width: 100%; margin-top: 16px; padding: 12px; border: none;
+    border-radius: 10px; background: var(--maroon); color: white;
+    font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  button:hover { background: var(--maroon-dark); }
+  button:disabled { background: var(--maroon-light); cursor: default; }
+
+  .card.odds-card { padding: 14px 16px; }
+  .card.odds-card h2 { margin-bottom: 8px; }
+
+  .matchup {
+    border: 1px solid var(--border); border-radius: 10px; padding: 6px 9px;
+    margin-top: 4px;
+  }
+  .mtop { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .mteam { display: flex; align-items: center; gap: 5px; min-width: 0; flex: 1; }
+  .mteam.right { flex-direction: row-reverse; text-align: right; }
+  .mavatar {
+    width: 18px; height: 18px; border-radius: 5px; object-fit: cover;
+    flex-shrink: 0; background: var(--maroon-tint);
+  }
+  .mavatar-fallback {
+    width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0;
+    background: var(--maroon); color: white; font-size: 9px; font-weight: 700;
+    display: none; align-items: center; justify-content: center;
+  }
+  .mname { font-weight: 600; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mvs { font-size: 9px; color: var(--muted); flex-shrink: 0; padding: 0 4px; font-weight: 600; }
+
+  .mbar { display: flex; width: 100%; height: 6px; border-radius: 3px; overflow: hidden; margin-top: 2px; background: var(--border); }
+  .mbar-fav { background: var(--maroon); height: 100%; }
+  .mbar-dog { background: var(--maroon-light); height: 100%; opacity: 0.55; }
+
+  .mbottom { display: flex; align-items: center; justify-content: space-between; margin-top: 1px; }
+  .mmeta { font-size: 10px; color: var(--muted); }
+  .mpct { font-weight: 700; font-size: 11.5px; color: var(--maroon-dark); }
+  .mmeta.right, .mpct.right { text-align: right; }
+
+  .status { font-size: 13px; color: var(--muted); margin-top: 10px; }
+  .error { font-size: 13px; color: #b91c1c; margin-top: 10px; }
+
+  .results { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .rrow { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; }
+  .rrow .label { color: var(--muted); font-size: 14px; }
+  .rrow .value { font-size: 20px; font-weight: 700; color: var(--maroon-dark); }
+  .rrow.profit .value { color: var(--profit); }
+  .rrow.cost .value { font-size: 16px; }
+
+  .note {
+    margin-top: 4px; font-size: 12px; color: var(--maroon-dark);
+    background: var(--maroon-tint); border-radius: 8px; padding: 10px 12px; line-height: 1.4;
+    border: 1px solid var(--border);
+  }
+  .disclaimer { font-size: 11px; color: var(--muted); margin-top: 10px; line-height: 1.4; }
+
+  details.options {
+    background: transparent; border: none; margin-top: 4px;
+  }
+  details.options summary {
+    cursor: pointer; font-size: 13px; font-weight: 600; color: var(--maroon);
+    padding: 10px 4px; list-style: none;
+  }
+  details.options summary::-webkit-details-marker { display: none; }
+  details.options summary::before { content: "⚙ "; }
+  details.options[open] summary::before { content: "⚙ "; }
+  .options-body { padding: 8px 4px 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header" id="headerBlock">
+    <div class="logo-placeholder" id="logoPlaceholder">🏈</div>
+    <img class="logo" id="logoImg" style="display:none;" />
+    <h1 id="leagueName">Loading league…</h1>
+    <div class="week-right" id="weekLabel"></div>
+  </div>
+
+  <div class="card odds-card">
+    <h2>Matchup Odds</h2>
+    <div id="status" class="status">Loading matchups…</div>
+    <div id="error" class="error"></div>
+    <div id="matchups"></div>
+  </div>
+
+  <div class="card">
+    <h2>FAAB Payout Calculator</h2>
+
+    <label for="teamSelect">Use a loaded matchup team (optional)</label>
+    <select id="teamSelect">
+      <option value="">— manual entry —</option>
+    </select>
+
+    <label for="units">FAAB bid (units)</label>
+    <input type="number" id="units" min="0" step="1" placeholder="e.g. 100" />
+
+    <label for="pct">Win probability (%)</label>
+    <input type="number" id="pct" min="0.01" max="100" step="0.1" placeholder="e.g. 50" />
+
+    <div class="results">
+      <div class="rrow">
+        <span class="label">Total if won</span>
+        <span class="value" id="total">0</span>
+      </div>
+      <div class="rrow profit">
+        <span class="label">Profit</span>
+        <span class="value" id="profit">0</span>
+      </div>
+    </div>
+    <p class="disclaimer">
+      Payout = bid ÷ win probability. Profit = payout − bid. Rounded down to the nearest whole unit.
+    </p>
+  </div>
+
+  <p class="note">
+    Win probabilities are <strong>estimated</strong> from real Sleeper player data, run through the league's actual scoring settings. Players whose real-world game has finished use actual points (shown as "X/Y locked in"); others use projections. In-progress games are treated as not-yet-started. Remaining uncertainty is modeled as ~30% around each team's total — fit against real Sleeper win percentages, but still an estimate, not Sleeper's official number.
+  </p>
+
+  <details class="options">
+    <summary>Options</summary>
+    <div class="options-body">
+      <label for="leagueId">Sleeper League ID</label>
+      <input id="leagueId" value="1312101511651655680" />
+
+      <label for="weekOverride">Week (blank = auto-detect current week)</label>
+      <input id="weekOverride" type="number" min="1" max="18" placeholder="auto" />
+
+      <label for="variability">Team variability (%)</label>
+      <input id="variability" type="number" min="1" step="1" value="30" />
+
+      <label for="projDecimals">Projection decimal places</label>
+      <input id="projDecimals" type="number" min="0" max="2" step="1" value="2" />
+
+      <label for="oddsDecimals">Odds decimal places</label>
+      <input id="oddsDecimals" type="number" min="0" max="2" step="1" value="0" />
+
+      <button id="reloadBtn">Reload with these settings</button>
+    </div>
+  </details>
+
+</div>
+
+<script>
+  const V1 = 'https://api.sleeper.app/v1';
+  const RAW = 'https://api.sleeper.com';
+
+  const leagueIdEl = document.getElementById('leagueId');
+  const weekOverrideEl = document.getElementById('weekOverride');
+  const variabilityEl = document.getElementById('variability');
+  const projDecimalsEl = document.getElementById('projDecimals');
+  const oddsDecimalsEl = document.getElementById('oddsDecimals');
+  const reloadBtn = document.getElementById('reloadBtn');
+  const statusEl = document.getElementById('status');
+  const errorEl = document.getElementById('error');
+  const matchupsEl = document.getElementById('matchups');
+  const teamSelect = document.getElementById('teamSelect');
+  const leagueNameEl = document.getElementById('leagueName');
+  const weekLabelEl = document.getElementById('weekLabel');
+  const logoImg = document.getElementById('logoImg');
+  const logoPlaceholder = document.getElementById('logoPlaceholder');
+
+  const unitsEl = document.getElementById('units');
+  const pctEl = document.getElementById('pct');
+  const totalEl = document.getElementById('total');
+  const profitEl = document.getElementById('profit');
+
+  // ---- payout calculator ----
+  function fmt(v) { return Math.floor(v).toString(); }
+  function calculate() {
+    const units = parseFloat(unitsEl.value) || 0;
+    const pct = parseFloat(pctEl.value) || 0;
+    const cost = units;
+    const total = pct > 0 ? units / (pct / 100) : 0;
+    const profit = total - cost;
+    totalEl.textContent = fmt(total);
+    profitEl.textContent = fmt(profit);
+  }
+  unitsEl.addEventListener('input', calculate);
+  pctEl.addEventListener('input', calculate);
+  teamSelect.addEventListener('change', () => {
+    const val = teamSelect.value;
+    if (val) { pctEl.value = val; calculate(); }
+  });
+  calculate();
+
+  // ---- stats helpers ----
+  function erf(x) {
+    const sign = x >= 0 ? 1 : -1;
+    x = Math.abs(x);
+    const a1=0.254829592, a2=-0.284496736, a3=1.421413741, a4=-1.453152027, a5=1.061405429, p=0.3275911;
+    const t = 1/(1+p*x);
+    const y = 1 - (((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+    return sign*y;
+  }
+  function normalCDF(z) { return 0.5 * (1 + erf(z / Math.sqrt(2))); }
+
+  async function fetchJSON(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Request failed (${res.status}): ${url}`);
+    return res.json();
+  }
+
+  function computeCustomScore(proj, scoringSettings) {
+    if (!proj || !scoringSettings) return 0;
+    const stats = proj.stats || proj;
+    let total = 0;
+    for (const [statKey, weight] of Object.entries(scoringSettings)) {
+      const val = stats[statKey];
+      if (typeof val === 'number' && typeof weight === 'number') {
+        total += val * weight;
+      }
+    }
+    return total;
+  }
+
+  function teamInfo(rosterId, rostersById, usersById) {
+    const roster = rostersById[rosterId];
+    const user = roster ? usersById[roster.owner_id] : null;
+    const name = user?.metadata?.team_name || user?.display_name || `Team ${rosterId}`;
+    const avatar = user?.avatar ? `https://sleepercdn.com/avatars/thumbs/${user.avatar}` : null;
+    return { name, avatar, initial: name.charAt(0).toUpperCase() };
+  }
+
+  function normalizeTeam(abbr) {
+    if (!abbr) return null;
+    const map = { WSH: 'WAS' }; // ESPN vs Sleeper abbreviation mismatches
+    return map[abbr] || abbr;
+  }
+
+  async function fetchGameFinalStatus(season, week, seasonType) {
+    const stype = seasonType === 'post' ? 3 : seasonType === 'pre' ? 1 : 2;
+    const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&seasontype=${stype}&year=${season}`;
+    try {
+      const data = await fetchJSON(url);
+      const statusByTeam = {};
+      (data.events || []).forEach(ev => {
+        const comp = ev.competitions?.[0];
+        const completed = !!comp?.status?.type?.completed;
+        (comp?.competitors || []).forEach(c => {
+          const abbr = normalizeTeam(c.team?.abbreviation);
+          if (abbr) statusByTeam[abbr] = completed;
+        });
+      });
+      return statusByTeam;
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function isTeamDefenseId(pid) {
+    return /^[A-Z]{2,3}$/.test(pid);
+  }
+
+  function playerTeamAbbr(pid, proj) {
+    if (isTeamDefenseId(pid)) return pid;
+    return proj?.team || proj?.player?.team || null;
+  }
+
+  async function loadMatchups() {
+    errorEl.textContent = '';
+    matchupsEl.innerHTML = '';
+    teamSelect.innerHTML = '<option value="">— manual entry —</option>';
+    statusEl.textContent = 'Loading matchups…';
+    reloadBtn.disabled = true;
+
+    try {
+      const leagueId = leagueIdEl.value.trim();
+      if (!leagueId) throw new Error('Enter a league ID.');
+
+      // Single call to determine season + current week (unless overridden).
+      const state = await fetchJSON(`${V1}/state/nfl`);
+      const week = parseInt(weekOverrideEl.value) || state.week || 1;
+      const season = state.season;
+      const variabilityPct = parseFloat(variabilityEl.value) || 30;
+
+      // Everything else fires in parallel — one round trip.
+      const [league, rosters, users, matchups, finalStatusByTeam, projArr] = await Promise.all([
+        fetchJSON(`${V1}/league/${leagueId}`),
+        fetchJSON(`${V1}/league/${leagueId}/rosters`),
+        fetchJSON(`${V1}/league/${leagueId}/users`),
+        fetchJSON(`${V1}/league/${leagueId}/matchups/${week}`),
+        fetchGameFinalStatus(season, week, state.season_type),
+        fetchJSON(`${RAW}/projections/nfl/${season}/${week}?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=K&position[]=DEF`),
+      ]);
+
+      // header: league name + logo
+      leagueNameEl.textContent = league?.name || 'League';
+      weekLabelEl.textContent = `Week ${week} · ${season}`;
+      if (league?.avatar) {
+        logoImg.src = `https://sleepercdn.com/avatars/${league.avatar}`;
+        logoImg.style.display = 'block';
+        logoPlaceholder.style.display = 'none';
+        logoImg.onerror = () => { logoImg.style.display = 'none'; logoPlaceholder.style.display = 'flex'; };
+      } else {
+        logoImg.style.display = 'none';
+        logoPlaceholder.style.display = 'flex';
+      }
+
+      if (!matchups || matchups.length === 0) {
+        statusEl.textContent = '';
+        errorEl.textContent = 'No matchups found for that league/week.';
+        return;
+      }
+
+      const scoringSettings = league?.scoring_settings || {};
+
+      const projById = {};
+      (Array.isArray(projArr) ? projArr : []).forEach(p => {
+        const pid = p.player_id || p.player?.player_id;
+        if (pid) projById[pid] = p;
+      });
+
+      const rostersById = {};
+      rosters.forEach(r => rostersById[r.roster_id] = r);
+      const usersById = {};
+      users.forEach(u => usersById[u.user_id] = u);
+
+      const teamProj = {};
+      matchups.forEach(m => {
+        const starters = m.starters || [];
+        const actualPoints = m.players_points || {};
+        let sum = 0;
+        let finalCount = 0;
+        starters.forEach(pid => {
+          if (pid === '0' || !pid) return;
+          const proj = projById[pid];
+          const team = playerTeamAbbr(pid, proj);
+          const gameFinal = team ? finalStatusByTeam[team] === true : false;
+          if (gameFinal && typeof actualPoints[pid] === 'number') {
+            sum += actualPoints[pid];
+            finalCount += 1;
+          } else {
+            sum += computeCustomScore(proj, scoringSettings);
+          }
+        });
+        teamProj[m.roster_id] = { matchupId: m.matchup_id, proj: sum, finalCount, totalCount: starters.filter(p => p && p !== '0').length };
+      });
+
+      const groups = {};
+      Object.entries(teamProj).forEach(([rosterId, data]) => {
+        if (!groups[data.matchupId]) groups[data.matchupId] = [];
+        groups[data.matchupId].push({ rosterId, proj: data.proj, finalCount: data.finalCount, totalCount: data.totalCount });
+      });
+
+      statusEl.textContent = '';
+
+      const projDecimals = Math.max(0, Math.min(2, parseInt(projDecimalsEl.value)));
+      const oddsDecimals = Math.max(0, Math.min(2, parseInt(oddsDecimalsEl.value)));
+
+      Object.values(groups).forEach(pair => {
+        if (pair.length !== 2) return;
+        const [a, b] = pair;
+        const teamA = teamInfo(a.rosterId, rostersById, usersById);
+        const teamB = teamInfo(b.rosterId, rostersById, usersById);
+        const diff = a.proj - b.proj;
+        const sigmaDiff = (variabilityPct / 100) * Math.sqrt(a.proj * a.proj + b.proj * b.proj);
+        const probA = normalCDF(diff / sigmaDiff) * 100;
+        const probB = 100 - probA;
+
+        function avatarHtml(team) {
+          if (team.avatar) {
+            return `<img class="mavatar" src="${team.avatar}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div class="mavatar-fallback">${team.initial}</div>`;
+          }
+          return `<div class="mavatar-fallback" style="display:flex;">${team.initial}</div>`;
+        }
+
+        const div = document.createElement('div');
+        div.className = 'matchup';
+        div.innerHTML = `
+          <div class="mtop">
+            <div class="mteam">
+              ${avatarHtml(teamA)}
+              <div class="mname">${teamA.name}</div>
+            </div>
+            <div class="mvs">vs</div>
+            <div class="mteam right">
+              ${avatarHtml(teamB)}
+              <div class="mname">${teamB.name}</div>
+            </div>
+          </div>
+          <div class="mbar">
+            <div class="${probA >= probB ? 'mbar-fav' : 'mbar-dog'}" style="width:${probA}%"></div>
+            <div class="${probA >= probB ? 'mbar-dog' : 'mbar-fav'}" style="width:${probB}%"></div>
+          </div>
+          <div class="mbottom">
+            <div>
+              <span class="mpct">${probA.toFixed(oddsDecimals)}%</span>
+              <span class="mmeta"> · ${a.proj.toFixed(projDecimals)} pts · ${a.finalCount}/${a.totalCount}</span>
+            </div>
+            <div>
+              <span class="mmeta right">${b.proj.toFixed(projDecimals)} pts · ${b.finalCount}/${b.totalCount} · </span>
+              <span class="mpct right">${probB.toFixed(oddsDecimals)}%</span>
+            </div>
+          </div>
+        `;
+        matchupsEl.appendChild(div);
+
+        const optA = document.createElement('option');
+        optA.value = probA.toFixed(1);
+        optA.textContent = `${teamA.name} (${probA.toFixed(oddsDecimals)}%)`;
+        teamSelect.appendChild(optA);
+
+        const optB = document.createElement('option');
+        optB.value = probB.toFixed(1);
+        optB.textContent = `${teamB.name} (${probB.toFixed(oddsDecimals)}%)`;
+        teamSelect.appendChild(optB);
+      });
+
+    } catch (err) {
+      statusEl.textContent = '';
+      errorEl.textContent = `${err.message}. If this persists, Sleeper's API may be unreachable from this environment.`;
+    } finally {
+      reloadBtn.disabled = false;
+    }
+  }
+
+  reloadBtn.addEventListener('click', loadMatchups);
+  window.addEventListener('DOMContentLoaded', loadMatchups);
+</script>
+</body>
+</html>
