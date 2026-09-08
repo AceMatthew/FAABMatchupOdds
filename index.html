@@ -65,6 +65,9 @@
     color: var(--text);
   }
   input:focus, select:focus { outline: none; border-color: var(--maroon); background: white; }
+  #pct::-webkit-outer-spin-button,
+  #pct::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  #pct { -moz-appearance: textfield; }
 
   button {
     width: 100%; margin-top: 16px; padding: 12px; border: none;
@@ -164,7 +167,7 @@
     <input type="number" id="units" min="0" step="1" placeholder="e.g. 100" />
 
     <label for="pct">Win probability (%)</label>
-    <input type="number" id="pct" min="0.01" max="100" step="0.1" placeholder="e.g. 50" />
+    <input type="number" id="pct" min="0" max="100" step="1" placeholder="e.g. 50" />
 
     <div class="results">
       <div class="rrow">
@@ -237,7 +240,7 @@
   function fmt(v) { return Math.floor(v).toString(); }
   function calculate() {
     const units = parseFloat(unitsEl.value) || 0;
-    const pct = parseFloat(pctEl.value) || 0;
+    const pct = Math.min(100, Math.max(0, parseFloat(pctEl.value) || 0));
     const cost = units;
     const total = pct > 0 ? units / (pct / 100) : 0;
     const profit = total - cost;
@@ -423,7 +426,8 @@
         const teamB = teamInfo(b.rosterId, rostersById, usersById);
         const diff = a.proj - b.proj;
         const sigmaDiff = (variabilityPct / 100) * Math.sqrt(a.proj * a.proj + b.proj * b.proj);
-        const probA = normalCDF(diff / sigmaDiff) * 100;
+        const rawProbA = sigmaDiff > 0 ? normalCDF(diff / sigmaDiff) * 100 : 50;
+        const probA = Math.min(100, Math.max(0, rawProbA));
         const probB = 100 - probA;
 
         function avatarHtml(team) {
@@ -466,12 +470,12 @@
         matchupsEl.appendChild(div);
 
         const optA = document.createElement('option');
-        optA.value = probA.toFixed(1);
+        optA.value = probA.toFixed(oddsDecimals);
         optA.textContent = `${teamA.name} (${probA.toFixed(oddsDecimals)}%)`;
         teamSelect.appendChild(optA);
 
         const optB = document.createElement('option');
-        optB.value = probB.toFixed(1);
+        optB.value = probB.toFixed(oddsDecimals);
         optB.textContent = `${teamB.name} (${probB.toFixed(oddsDecimals)}%)`;
         teamSelect.appendChild(optB);
       });
