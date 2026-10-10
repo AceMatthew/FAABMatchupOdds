@@ -106,8 +106,10 @@
   .mbottom { display: flex; align-items: center; justify-content: space-between; margin-top: 1px; }
   .mmeta { font-size: 10px; color: var(--muted); }
   .mpct { font-weight: 700; font-size: 11.5px; color: var(--maroon-dark); }
-  .mside { min-width: 0; }
+  .mside { min-width: 0; flex: 1 1 0; }
   .mside.right { text-align: right; }
+  .mside .mmeta { white-space: nowrap; font-size: 9px; letter-spacing: -0.1px; }
+  @media (max-width: 380px) { .mside .mmeta { font-size: 8px; } }
 
   .status { font-size: 13px; color: var(--muted); margin-top: 10px; }
   .error { font-size: 13px; color: #b91c1c; margin-top: 10px; }
@@ -199,7 +201,7 @@
       <input id="weekOverride" type="number" min="1" max="18" placeholder="auto" />
 
       <label for="variability">Team variability (%)</label>
-      <input id="variability" type="number" min="1" step="1" value="30" />
+      <input id="variability" type="number" min="1" step="0.5" value="30.5" />
 
       <label for="projDecimals">Projection decimal places</label>
       <input id="projDecimals" type="number" min="0" max="2" step="1" value="2" />
@@ -340,7 +342,7 @@
       const state = await fetchJSON(`${V1}/state/nfl`);
       const week = parseInt(weekOverrideEl.value) || state.week || 1;
       const season = state.season;
-      const variabilityPct = parseFloat(variabilityEl.value) || 30;
+      const variabilityPct = parseFloat(variabilityEl.value) || 30.5;
 
       // Everything else fires in parallel — one round trip.
       const [league, rosters, users, matchups, finalStatus, projArr] = await Promise.all([
@@ -473,14 +475,12 @@
           </div>
           <div class="mbottom">
             <div class="mside">
-              <span class="mpct">${probA.toFixed(oddsDecimals)}%</span>
-              <span class="mmeta"> · ${a.finalCount}/${a.totalCount} final</span>
-              <div class="mmeta">${a.current.toFixed(projDecimals)} now · ${a.proj.toFixed(projDecimals)} proj</div>
+              <div class="mpct">${probA.toFixed(oddsDecimals)}%</div>
+              <div class="mmeta">${a.finalCount}/${a.totalCount} final · ${a.current.toFixed(projDecimals)} now · ${a.proj.toFixed(projDecimals)} proj</div>
             </div>
             <div class="mside right">
-              <span class="mmeta">${b.finalCount}/${b.totalCount} final · </span>
-              <span class="mpct">${probB.toFixed(oddsDecimals)}%</span>
-              <div class="mmeta">${b.current.toFixed(projDecimals)} now · ${b.proj.toFixed(projDecimals)} proj</div>
+              <div class="mpct">${probB.toFixed(oddsDecimals)}%</div>
+              <div class="mmeta">${b.finalCount}/${b.totalCount} final · ${b.current.toFixed(projDecimals)} now · ${b.proj.toFixed(projDecimals)} proj</div>
             </div>
           </div>
         `;
