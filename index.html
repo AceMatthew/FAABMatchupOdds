@@ -285,6 +285,10 @@
     return total;
   }
 
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
   function teamInfo(rosterId, rostersById, usersById) {
     const roster = rostersById[rosterId];
     const user = roster ? usersById[roster.owner_id] : null;
@@ -392,6 +396,7 @@
         const starters = m.starters || [];
         const actualPoints = m.players_points || {};
         let sum = 0;
+        let remaining = 0; // projected points still to be played (games not final)
         let finalCount = 0;
         starters.forEach(pid => {
           if (pid === '0' || !pid) return;
@@ -402,16 +407,18 @@
             sum += actualPoints[pid];
             finalCount += 1;
           } else {
-            sum += computeCustomScore(proj, scoringSettings);
+            const pts = computeCustomScore(proj, scoringSettings);
+            sum += pts;
+            remaining += pts;
           }
         });
-        teamProj[m.roster_id] = { matchupId: m.matchup_id, proj: sum, finalCount, totalCount: starters.filter(p => p && p !== '0').length };
+        teamProj[m.roster_id] = { matchupId: m.matchup_id, proj: sum, remaining, finalCount, totalCount: starters.filter(p => p && p !== '0').length };
       });
 
       const groups = {};
       Object.entries(teamProj).forEach(([rosterId, data]) => {
         if (!groups[data.matchupId]) groups[data.matchupId] = [];
-        groups[data.matchupId].push({ rosterId, proj: data.proj, finalCount: data.finalCount, totalCount: data.totalCount });
+        groups[data.matchupId].push({ rosterId, proj: data.proj, remaining: data.remaining, finalCount: data.finalCount, totalCount: data.totalCount });
       });
 
       statusEl.textContent = '';
@@ -425,17 +432,24 @@
         const teamA = teamInfo(a.rosterId, rostersById, usersById);
         const teamB = teamInfo(b.rosterId, rostersById, usersById);
         const diff = a.proj - b.proj;
-        const sigmaDiff = (variabilityPct / 100) * Math.sqrt(a.proj * a.proj + b.proj * b.proj);
-        const rawProbA = sigmaDiff > 0 ? normalCDF(diff / sigmaDiff) * 100 : 50;
+        // Variance applies only to the unplayed share of each team's score:
+        // sigma = v * total * sqrt(unplayed / total). With nothing locked this equals v * total
+        // (the original model); as games finish, locked-in points stop adding uncertainty.
+        const v = variabilityPct / 100;
+        const sigmaOf = t => v * Math.sqrt(Math.max(0, t.proj) * Math.max(0, t.remaining));
+        const sigmaDiff = Math.sqrt(sigmaOf(a) ** 2 + sigmaOf(b) ** 2);
+        const rawProbA = sigmaDiff > 0
+          ? normalCDF(diff / sigmaDiff) * 100
+          : (diff > 0 ? 100 : diff < 0 ? 0 : 50); // nothing left to play: result is decided
         const probA = Math.min(100, Math.max(0, rawProbA));
         const probB = 100 - probA;
 
         function avatarHtml(team) {
           if (team.avatar) {
-            return `<img class="mavatar" src="${team.avatar}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                    <div class="mavatar-fallback">${team.initial}</div>`;
+            return `<img class="mavatar" src="${escapeHtml(team.avatar)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div class="mavatar-fallback">${escapeHtml(team.initial)}</div>`;
           }
-          return `<div class="mavatar-fallback" style="display:flex;">${team.initial}</div>`;
+          return `<div class="mavatar-fallback" style="display:flex;">${escapeHtml(team.initial)}</div>`;
         }
 
         const div = document.createElement('div');
@@ -444,12 +458,12 @@
           <div class="mtop">
             <div class="mteam">
               ${avatarHtml(teamA)}
-              <div class="mname">${teamA.name}</div>
+              <div class="mname">${escapeHtml(teamA.name)}</div>
             </div>
             <div class="mvs">vs</div>
             <div class="mteam right">
               ${avatarHtml(teamB)}
-              <div class="mname">${teamB.name}</div>
+              <div class="mname">${escapeHtml(teamB.name)}</div>
             </div>
           </div>
           <div class="mbar">
