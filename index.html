@@ -106,7 +106,8 @@
   .mbottom { display: flex; align-items: center; justify-content: space-between; margin-top: 1px; }
   .mmeta { font-size: 10px; color: var(--muted); }
   .mpct { font-weight: 700; font-size: 11.5px; color: var(--maroon-dark); }
-  .mmeta.right, .mpct.right { text-align: right; }
+  .mside { min-width: 0; }
+  .mside.right { text-align: right; }
 
   .status { font-size: 13px; color: var(--muted); margin-top: 10px; }
   .error { font-size: 13px; color: #b91c1c; margin-top: 10px; }
@@ -297,29 +298,21 @@
     return { name, avatar, initial: name.charAt(0).toUpperCase() };
   }
 
-  function normalizeTeam(abbr) {
-    if (!abbr) return null;
-    const map = { WSH: 'WAS' }; // ESPN vs Sleeper abbreviation mismatches
-    return map[abbr] || abbr;
-  }
-
-  async function fetchGameFinalStatus(season, week, seasonType) {
-    const stype = seasonType === 'post' ? 3 : seasonType === 'pre' ? 1 : 2;
-    const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&seasontype=${stype}&year=${season}`;
+  // Which NFL teams have a FINAL game this week, from Sleeper's own schedule.
+  // (ESPN's scoreboard was returning last season's games, which marked unplayed games as final.)
+  async function fetchGameFinalStatus(season, week) {
     try {
-      const data = await fetchJSON(url);
+      const games = await fetchJSON(`${RAW}/schedule/nfl/regular/${season}`);
       const statusByTeam = {};
-      (data.events || []).forEach(ev => {
-        const comp = ev.competitions?.[0];
-        const completed = !!comp?.status?.type?.completed;
-        (comp?.competitors || []).forEach(c => {
-          const abbr = normalizeTeam(c.team?.abbreviation);
-          if (abbr) statusByTeam[abbr] = completed;
-        });
+      (Array.isArray(games) ? games : []).forEach(g => {
+        if (Number(g.week) !== week) return;
+        const done = g.status === 'complete';
+        if (g.home) statusByTeam[g.home] = done;
+        if (g.away) statusByTeam[g.away] = done;
       });
-      return statusByTeam;
+      return { statusByTeam, ok: Object.keys(statusByTeam).length > 0 };
     } catch (e) {
-      return {};
+      return { statusByTeam: {}, ok: false };
     }
   }
 
@@ -350,14 +343,16 @@
       const variabilityPct = parseFloat(variabilityEl.value) || 30;
 
       // Everything else fires in parallel — one round trip.
-      const [league, rosters, users, matchups, finalStatusByTeam, projArr] = await Promise.all([
+      const [league, rosters, users, matchups, finalStatus, projArr] = await Promise.all([
         fetchJSON(`${V1}/league/${leagueId}`),
         fetchJSON(`${V1}/league/${leagueId}/rosters`),
         fetchJSON(`${V1}/league/${leagueId}/users`),
         fetchJSON(`${V1}/league/${leagueId}/matchups/${week}`),
-        fetchGameFinalStatus(season, week, state.season_type),
+        fetchGameFinalStatus(season, week),
         fetchJSON(`${RAW}/projections/nfl/${season}/${week}?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=K&position[]=DEF`),
       ]);
+
+      const finalStatusByTeam = finalStatus.statusByTeam;
 
       // header: league name + logo
       leagueNameEl.textContent = league?.name || 'League';
@@ -412,16 +407,22 @@
             remaining += pts;
           }
         });
-        teamProj[m.roster_id] = { matchupId: m.matchup_id, proj: sum, remaining, finalCount, totalCount: starters.filter(p => p && p !== '0').length };
+        const current = typeof m.points === 'number'
+          ? m.points
+          : starters.reduce((t, pid) => t + (typeof actualPoints[pid] === 'number' ? actualPoints[pid] : 0), 0);
+        teamProj[m.roster_id] = { matchupId: m.matchup_id, proj: sum, remaining, current, finalCount, totalCount: starters.filter(p => p && p !== '0').length };
       });
 
       const groups = {};
       Object.entries(teamProj).forEach(([rosterId, data]) => {
         if (!groups[data.matchupId]) groups[data.matchupId] = [];
-        groups[data.matchupId].push({ rosterId, proj: data.proj, remaining: data.remaining, finalCount: data.finalCount, totalCount: data.totalCount });
+        groups[data.matchupId].push({ rosterId, proj: data.proj, remaining: data.remaining, current: data.current, finalCount: data.finalCount, totalCount: data.totalCount });
       });
 
       statusEl.textContent = '';
+      if (!finalStatus.ok) {
+        errorEl.textContent = "Couldn't load NFL game statuses, so already-played points aren't locked in. Odds use projections only.";
+      }
 
       const projDecimals = Math.max(0, Math.min(2, parseInt(projDecimalsEl.value)));
       const oddsDecimals = Math.max(0, Math.min(2, parseInt(oddsDecimalsEl.value)));
@@ -471,13 +472,15 @@
             <div class="${probA >= probB ? 'mbar-dog' : 'mbar-fav'}" style="width:${probB}%"></div>
           </div>
           <div class="mbottom">
-            <div>
+            <div class="mside">
               <span class="mpct">${probA.toFixed(oddsDecimals)}%</span>
-              <span class="mmeta"> · ${a.proj.toFixed(projDecimals)} pts · ${a.finalCount}/${a.totalCount}</span>
+              <span class="mmeta"> · ${a.finalCount}/${a.totalCount} final</span>
+              <div class="mmeta">${a.current.toFixed(projDecimals)} now · ${a.proj.toFixed(projDecimals)} proj</div>
             </div>
-            <div>
-              <span class="mmeta right">${b.proj.toFixed(projDecimals)} pts · ${b.finalCount}/${b.totalCount} · </span>
-              <span class="mpct right">${probB.toFixed(oddsDecimals)}%</span>
+            <div class="mside right">
+              <span class="mmeta">${b.finalCount}/${b.totalCount} final · </span>
+              <span class="mpct">${probB.toFixed(oddsDecimals)}%</span>
+              <div class="mmeta">${b.current.toFixed(projDecimals)} now · ${b.proj.toFixed(projDecimals)} proj</div>
             </div>
           </div>
         `;
