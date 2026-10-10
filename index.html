@@ -108,8 +108,11 @@
   .mpct { font-weight: 700; font-size: 11.5px; color: var(--maroon-dark); }
   .mside { flex: 1 1 0; min-width: 0; white-space: nowrap; }
   .mside.right { text-align: right; }
-  .legend { font-size: 10px; color: var(--muted); margin: -4px 0 6px; }
-  @media (max-width: 380px) { .mside .mmeta { font-size: 9px; } .mside .mpct { font-size: 11px; } }
+  .mdetail { display: none; justify-content: space-between; gap: 6px; }
+  .show-details .mdetail { display: flex; }
+  .toggle-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  .toggle-row input { width: auto; padding: 0; margin: 0; accent-color: var(--maroon); }
+  .toggle-row label { margin: 0; cursor: pointer; }
 
   .status { font-size: 13px; color: var(--muted); margin-top: 10px; }
   .error { font-size: 13px; color: #b91c1c; margin-top: 10px; }
@@ -153,7 +156,6 @@
 
   <div class="card odds-card">
     <h2>Matchup Odds</h2>
-    <div class="legend">win % · games final · points now · points projected</div>
     <div id="status" class="status">Loading matchups…</div>
     <div id="error" class="error"></div>
     <div id="matchups"></div>
@@ -210,6 +212,11 @@
       <label for="oddsDecimals">Odds decimal places</label>
       <input id="oddsDecimals" type="number" min="0" max="2" step="1" value="0" />
 
+      <div class="toggle-row">
+        <input type="checkbox" id="showDetails" />
+        <label for="showDetails">Show final players and current score</label>
+      </div>
+
       <button id="reloadBtn">Reload with these settings</button>
     </div>
   </details>
@@ -237,6 +244,15 @@
 
   const unitsEl = document.getElementById('units');
   const pctEl = document.getElementById('pct');
+  const showDetailsEl = document.getElementById('showDetails');
+  function applyDetails() {
+    document.querySelector('.wrap').classList.toggle('show-details', showDetailsEl.checked);
+    try { localStorage.setItem('showDetails', showDetailsEl.checked ? '1' : '0'); } catch (e) {}
+  }
+  try { showDetailsEl.checked = localStorage.getItem('showDetails') === '1'; } catch (e) {}
+  showDetailsEl.addEventListener('change', applyDetails);
+  applyDetails();
+
   const totalEl = document.getElementById('total');
   const profitEl = document.getElementById('profit');
 
@@ -477,12 +493,16 @@
           <div class="mbottom">
             <div class="mside">
               <span class="mpct">${probA.toFixed(oddsDecimals)}%</span>
-              <span class="mmeta"> · ${a.finalCount}/${a.totalCount} · ${a.current.toFixed(projDecimals)} · ${a.proj.toFixed(projDecimals)}</span>
+              <span class="mmeta"> · ${a.proj.toFixed(projDecimals)} pts</span>
             </div>
             <div class="mside right">
+              <span class="mmeta">${b.proj.toFixed(projDecimals)} pts · </span>
               <span class="mpct">${probB.toFixed(oddsDecimals)}%</span>
-              <span class="mmeta"> · ${b.finalCount}/${b.totalCount} · ${b.current.toFixed(projDecimals)} · ${b.proj.toFixed(projDecimals)}</span>
             </div>
+          </div>
+          <div class="mdetail">
+            <div class="mside"><span class="mmeta">${a.finalCount}/${a.totalCount} final · ${a.current.toFixed(projDecimals)} now</span></div>
+            <div class="mside right"><span class="mmeta">${b.current.toFixed(projDecimals)} now · ${b.finalCount}/${b.totalCount} final</span></div>
           </div>
         `;
         matchupsEl.appendChild(div);
